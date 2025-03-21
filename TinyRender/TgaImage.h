@@ -27,6 +27,16 @@ struct TgaColor {
     std::uint8_t& operator[](const int i) {
         return bgra[i];
     }
+    TgaColor operator * (const float intensity) {
+        TgaColor res = *this;
+        float m_intensity = intensity;
+        if (intensity > 1.0f) m_intensity = 1.0f;
+        if (intensity < 0.0f)m_intensity = 0.0f;
+        for (int i = 0; i < 4; ++i) {
+            res.bgra[i] = bgra[i] * intensity;
+        }
+        return res;
+    }
 };
 
 class TgaImage

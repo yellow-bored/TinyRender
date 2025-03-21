@@ -128,11 +128,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="geometry.h" />
+    <ClInclude Include="gl.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="TgaImage.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="geometry.cpp" />
+    <ClCompile Include="gl.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="model.cpp" />
     <ClCompile Include="TgaImage.cpp" />
