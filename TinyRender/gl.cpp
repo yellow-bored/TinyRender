@@ -18,7 +18,7 @@ void Viewport(int width, int height) {
 
 void Projection(float camera_z) {
 	projection = Matrix::identity();
-	projection[3][2] = -1.0f / camera_z;
+	projection[3][2] = camera_z;
 }
 
 void Lookat(Vec3f eye_pos, Vec3f center, Vec3f up) {
@@ -34,7 +34,7 @@ void Lookat(Vec3f eye_pos, Vec3f center, Vec3f up) {
 		rotation[2][i] = z[i];
 	}
 	for (int i = 0; i < 3; ++i) {
-		translation[i][3] = -center[i];
+		translation[i][3] = -eye_pos[i];
 	}
 	// 先平移后旋转
 	lookat = rotation * translation;
@@ -44,7 +44,7 @@ void Scale(float size) {
 	scale[0][0] = size;
 	scale[1][1] = size;
 	scale[2][2] = size;
-	scale[3][3] = 1;
+	//scale[3][3] = 1;
 }
 
 // 三个点算面积
@@ -62,7 +62,7 @@ Vec3f Barycentric(Vec2f Pt1, Vec2f Pt2, Vec2f Pt3, Vec2f Pt0) {
 	return bc;
 }
 
-void Triangle(Vec4f* pts, Shader& shader, TgaImage& image, TgaImage& zBuffer) {
+void Triangle(Vec4f* pts, Shader& shader, TgaImage& image, float* zBuffer) {
 	float x_l = std::min(std::min(pts[0][0] / pts[0][3], pts[1][0] / pts[1][3]), pts[2][0] / pts[2][3]);
 	float x_r = std::max(std::max(pts[0][0] / pts[0][3], pts[1][0] / pts[1][3]), pts[2][0] / pts[2][3]);
 	float y_b = std::min(std::min(pts[0][1] / pts[0][3], pts[1][1] / pts[1][3]), pts[2][1] / pts[2][3]);
@@ -84,14 +84,14 @@ void Triangle(Vec4f* pts, Shader& shader, TgaImage& image, TgaImage& zBuffer) {
 			if (bc.x < 0 || bc.y < 0 || bc.z < 0) continue;// Inside Triangle
 				
 				float z = bc_re.x * pts[0][2] / pts[0][3] + bc_re.y * pts[1][2] / pts[1][3] + bc_re.z * pts[2][2] / pts[2][3];
-				z = std::max(0, std::min(255, int(z+0.5)));
-				if (z >= zBuffer.Get(i, j)[0]) {
+				//z = std::max(0.0f, std::min(255.0f, z));
+				if (z >= zBuffer[i+j*image.Width()]) {
 					TgaColor color;
 
 					bool drop = shader.Fragment(bc_re, color);
 					if (!drop) {
 						TgaColor z_color = { int(z) };
-						zBuffer.Set(i, j, z_color);
+						zBuffer[i+ j*image.Width()] = z;
 						image.Set(i, j, color);
 					}
 					//TgaColor Tex = model->diffuse(bc_uv_i);

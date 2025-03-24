@@ -1,6 +1,7 @@
 #include "TgaImage.h"
 #include <cstring>
 #include <iostream>
+#include <limits>
 
 
 TgaImage::TgaImage(const int width, const int height, const int bpp) :m_Width(width), m_Height(height), m_bpp(bpp), m_data(width* height* bpp) {}
