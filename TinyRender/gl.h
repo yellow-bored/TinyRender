@@ -2,6 +2,7 @@
 
 #include"geometry.h"
 #include"TgaImage.h"
+#include"model.h"
 
 
 extern Matrix viewport;
@@ -18,7 +19,7 @@ void Scale(float size);
 class Shader {
 public:
 	virtual ~Shader() {}
-	virtual Vec4f Vertex(int face, int vert) = 0; // 读取顶点
+	virtual Vec4f Vertex(int face, int vert, Model* model) = 0; // 读取顶点
 	virtual bool Fragment(Vec3f bar, TgaColor& color) = 0; //片段
 };
 

@@ -183,7 +183,7 @@ TgaColor TgaImage::Get(const int x, const int y) const {
 }
 
 void TgaImage::Set(int x, int y, const TgaColor& c) {
-	if (m_data.empty() || x<0 || y<0 || x>m_Width || y>m_Height) return;
+	if (m_data.empty() || x<0 || y<0 || x>=m_Width || y>=m_Height) return;
 	memcpy(m_data.data() + (x + y * m_Width) * m_bpp, c.bgra, m_bpp);
 }
 

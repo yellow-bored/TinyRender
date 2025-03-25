@@ -6,17 +6,19 @@
 #include <limits>
 #include "gl.h"
 #include "geometry.h"
+#include <cmath>
 
 const int WIDTH = 1000;
 const int HEIGHT = 1000;
 const int DEPTH = 255;
 
-Model* model = NULL;
-Model* model2 = NULL;
+const float PI = std::acos(-1.0f);
+
+
 
 // 坐标系
-Vec3f camera(0, 1, 4); // 相机坐标
-Vec3f light_dir(2, 2, 3);
+Vec3f camera(0, -1, 2); // 相机坐标
+Vec3f light_dir(1, 2, 3);
 Vec3f center(0, 0, 0);
 Vec3f up(0, 1, 0);
 
@@ -26,7 +28,7 @@ float* zBuffer;
 float* shadowBuffer;
 
 
-
+/*
 class GouraudShader :public Shader {
 	Vec3f m_intensity; // 记录三个顶点光线，fragmen内做插值
 public:
@@ -177,11 +179,12 @@ public:
 		return false;
 	}
 };
+*/
 
 class ShadowShader :public Shader {
 	mat<3, 3, float> m_tri;
 public:
-	virtual Vec4f Vertex(int face, int vert) { // 返回计算后屏幕上的坐标
+	virtual Vec4f Vertex(int face, int vert, Model *model) { // 返回计算后屏幕上的坐标
 		Vec4f m_vertex = embed<4>(model->vert(face, vert)); //	 齐次化
 
 		m_vertex = viewport * projection * scale * lookat * m_vertex; // 转换到屏幕坐标
@@ -206,9 +209,11 @@ class TShadowShader :public Shader {
 	mat<4, 4, float> m_M; // projection * scale * lookat 用于计算法线
 	mat<4, 4, float> m_shadowM;
 	const float m_ambient = 5;
+	Model* m_model;
 public:
 	TShadowShader(Matrix s_m) :m_shadowM(s_m){}
-	virtual Vec4f Vertex(int face, int vert) { // 返回计算后屏幕上的坐标
+	virtual Vec4f Vertex(int face, int vert, Model *model) { // 返回计算后屏幕上的坐标
+		m_model = model;
 		Vec4f m_vertex = embed<4>(model->vert(face, vert)); //	 齐次化
 		
 		m_M =   scale * lookat;
@@ -248,18 +253,23 @@ public:
 		for (int i = 0; i < 4; ++i) {
 			res.set_col(i, m_M[i]);
 		}
-		Vec3f n = proj<3>(m_M.invert_transpose() * embed<4>( model->normal(uv),0.0f)).normalize();
+		//std::cout << model->normal(uv)[0]<<' '<< model->normal(uv)[1]<<' '<< model->normal(uv)[2]<<std::endl;
+		Vec3f n = proj<3>(m_M.invert_transpose() * embed<4>( m_model->normal(uv),0.0f)).normalize();
 		Vec3f l = proj<3>(m_M * embed<4>(light_dir,0.0f)).normalize();
 
 		//阴影的修正
 		float bias = std::max(0.05f * (1.0f - n * l), 0.005f);
-		float shadow = 0.3f + 0.7f * (shadowBuffer[int(pt_s[0]) + WIDTH * int(pt_s[1])] <= pt_s[2]+bias*255.f);
 
+		float shadow = 1.0f;
+		if (int(pt_s[0]) + WIDTH * int(pt_s[1]) >= 0 && int(pt_s[0]) + WIDTH * int(pt_s[1])<=WIDTH*HEIGHT) {
+			shadow = 0.3f + 0.7f * (shadowBuffer[int(pt_s[0]) + WIDTH * int(pt_s[1])] <= pt_s[2] + bias * 255.f);
+		}
 		Vec3f half_dir = (l + n).normalize();// 半程向量
 		float specular = std::pow(std::max(0.0f, n * half_dir), 32);
 		float diffuse = std::max(0.0f, n * l);
+		//std::cout << n << ' ' << l << ' ' << n * l << std::endl;
 
-		color = model->diffuse(uv);
+		color = m_model->diffuse(uv);
 		for (int i = 0; i < 3; ++i) {
 			color[i] = std::min(255.f, color[i] * shadow * (0.6f * specular + diffuse) + m_ambient);
 		}
@@ -274,13 +284,12 @@ void LoadShadow(Model *model) {
 	for (int i = 0; i < model->nfaces(); ++i) {
 		Vec4f pts[3];
 		for (int j = 0; j < 3; ++j) {
-			pts[j] = s_shader.Vertex(i, j); // 记录顶点，已经是齐次坐标
+			pts[j] = s_shader.Vertex(i, j, model); // 记录顶点，已经是齐次坐标
 		}
 		Triangle(pts, s_shader, depth, shadowBuffer);
 	}
 }
 
-//Matrix M;// = projection * scale * lookat;
 
 void LoadVertex(Model *model, Matrix M) {
 	TShadowShader shader(M);
@@ -288,20 +297,36 @@ void LoadVertex(Model *model, Matrix M) {
 		//std::cout << i << " face" << std::endl;
 		Vec4f pts[3];
 		for (int j = 0; j < 3; ++j) {
-			pts[j] = shader.Vertex(i, j); // 记录顶点，已经是齐次坐标
+			pts[j] = shader.Vertex(i, j, model); // 记录顶点，已经是齐次坐标
 		}
 		Triangle(pts, shader, image, zBuffer);
 	}
 }
+
+float GetMaxAngle(Vec2f pt, int dir) {
+	float angle_max = 0;
+	Vec2f direction;
+	direction.x = std::cos(dir * PI / 4.0f);
+	direction.y = std::sin(dir * PI / 4.0f);
+	for (int i = 0; i < 1000; ++i) {
+		Vec2f pt_c = pt + direction * (i * 1.0f);
+		if (pt_c.x < 0 || pt_c.y < 0 || pt_c.x >= WIDTH || pt_c.y >= HEIGHT) return angle_max;//到边界直接返回
+		float h = zBuffer[int(pt_c.x) + int(pt_c.y) * WIDTH] - zBuffer[int(pt.x) + int(pt.y) * WIDTH];
+		float dis = std::sqrt((pt_c.x - pt.x) * (pt_c.x - pt.x) + (pt_c.y - pt.y) * (pt_c.y - pt.y));
+		angle_max = std::max(angle_max, std::atanf(h / dis));
+	}
+	return angle_max;
+}
+
 int main() {
 
-
-
 	// 载入模型
-	model = new Model("obj/african_head/african_head.obj");
+	Model* model = NULL;
+	Model* model2 = NULL;
+	//model2 = new Model("obj/african_head/african_head.obj");
 	//model = new Model("obj/floor.obj");
 	//model = new Model("obj/boggie/head.obj");
-	//model = new Model("obj/diablo3_pose/diablo3_pose.obj");
+	model2 = new Model("obj/diablo3_pose/diablo3_pose.obj");
 
 	// 创建zBuffer
 	zBuffer = new float[WIDTH * HEIGHT];
@@ -314,13 +339,12 @@ int main() {
 	Viewport(WIDTH, HEIGHT);
 	Scale(0.9f);
 	light_dir.normalize();
-	//M = projection * scale * lookat;
 
 
-	LoadShadow(model);
+	//LoadShadow(model);
 	//LoadShadow(model2);
 
-	depth.Write_Tga_File("depth.tga");
+	//depth.Write_Tga_File("depth.tga");
 
 
 	// 计算投影，lookat，viewport,scale矩阵
@@ -331,10 +355,25 @@ int main() {
 	Viewport(WIDTH, HEIGHT);
 	Scale(0.9f);
 
-	LoadVertex(model,M);
-	//LoadVertex(model2);
+	//LoadVertex(model,M);
+	LoadVertex(model2,M);
+
+	for (int x = 0; x < WIDTH; ++x) {
+		for (int y = 0; y < HEIGHT; ++y) {
+			if (zBuffer[x + y * WIDTH] < -1e5) continue;// 不考虑背景
+			float irate = 0; //半球范围内接受到的光线
+			for (int k = 0; k < 8; ++k) {
+				irate += GetMaxAngle(Vec2f(x, y), k);
+			}
+			irate = 1 - irate / PI / 4;
+			irate = std::pow(irate, 100);
+			TgaColor c = { irate * 255,irate * 255,irate * 255 };
+			image.Set(x, y, c);
+		}
+	}
+
 	image.Write_Tga_File("output.tga");
 	delete model;
-	//delete model2;
+	delete model2;
 	return 0;
 }

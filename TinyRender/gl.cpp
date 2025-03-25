@@ -67,7 +67,10 @@ void Triangle(Vec4f* pts, Shader& shader, TgaImage& image, float* zBuffer) {
 	float x_r = std::max(std::max(pts[0][0] / pts[0][3], pts[1][0] / pts[1][3]), pts[2][0] / pts[2][3]);
 	float y_b = std::min(std::min(pts[0][1] / pts[0][3], pts[1][1] / pts[1][3]), pts[2][1] / pts[2][3]);
 	float y_u = std::max(std::max(pts[0][1] / pts[0][3], pts[1][1] / pts[1][3]), pts[2][1] / pts[2][3]);
-
+	x_l = std::min(std::max(x_l, 0.0f), 1.0f*image.Width());
+	x_r = std::max(0, std::min(int(x_r), image.Width() - 1));
+	y_b = std::min(std::max(y_b, 0.0f), image.Height() * 1.0f);
+	y_u = std::max(std::min(int(y_u), image.Height() - 1), 0);
 
 	for (int i = x_l; i <= x_r; ++i) {
 		for (int j = y_b; j <= y_u; ++j) {
@@ -92,14 +95,11 @@ void Triangle(Vec4f* pts, Shader& shader, TgaImage& image, float* zBuffer) {
 					if (!drop) {
 						TgaColor z_color = { int(z) };
 						zBuffer[i+ j*image.Width()] = z;
+						//if((j>=999))
+							//std::cout << i << ' ' << j << std::endl;
 						image.Set(i, j, color);
 					}
-					//TgaColor Tex = model->diffuse(bc_uv_i);
 				}
-//				else std::cout << int(zBuffer.Get(i, j)[0]) <<' ' << z << std::endl;
-
-			
-
 		}
 	}
 }
